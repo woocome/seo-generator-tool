@@ -1,22 +1,35 @@
 from flask import Flask, request, jsonify
-from openai import AsyncOpenAI
+from dotenv import load_dotenv
+from openai import OpenAI
 from flask_cors import CORS
 import os
+import openai
+
+load_dotenv()
 
 # Initialize the Flask application
 app = Flask(__name__)
-CORS(app, resources={r"/generate-seo-title": {"origins": "http://127.0.0.1:5500"}})
+
+allowed_origins = [
+    'http://127.0.0.1:5500',
+    'https://seo-generation-tool.design.webflow.com',
+    'https://seo-generation-tool.webflow.io',
+    'https://*.webflow.io',
+    'https://*.webflow.com',  # This allows all subdomains of example.com
+]
+
+CORS(app, resources={r"/generate-seo-title": {"origins": allowed_origins}})
 
 # Set your OpenAI API key
-client = AsyncOpenAI(
-  api_key="api_key"  # Replace with your actual API key
+client = OpenAI(
+    # This is the default and can be omitted
+    api_key=os.environ.get("OPENAI_API_KEY"),
 )
-
 # Define a route to generate an SEO meta title
 @app.route('/generate-seo-title', methods=['POST', 'GET'])
-async def generate_seo_title():
+def generate_seo_title():
     data = request.json
-    keyword = data.get('keyword')
+    keyword = data.get('keyword', 'financial')
     type_ = data.get('type')
     
     if type_ not in ["Blog", "Landing Page"]:
@@ -26,7 +39,7 @@ async def generate_seo_title():
     prompt = f"Generate an SEO-optimized meta title for a {type_} using the keyword '{keyword}'."
 
     # Generate SEO title using OpenAI
-    response = await client.chat.completions.create(
+    chat = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are an SEO expert."},
@@ -35,7 +48,7 @@ async def generate_seo_title():
         max_tokens=50
     )
 
-    meta_title = response.choices[0].message['content'].strip()
+    meta_title = chat.choices[0].message.content.strip()
 
     return jsonify({"meta_title": meta_title})
 
